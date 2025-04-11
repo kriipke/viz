@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Visualizer UI</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      font-family: sans-serif;
+      color: white;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+    #topBar {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      justify-content: center;
+      padding: 10px;
+      z-index: 1000;
+    }
+    #topBar button {
+      background: #333;
+      color: #fff;
+      border: 1px solid #888;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .floating-panel {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 10px;
+      border-radius: 8px;
+      max-width: 320px;
+      z-index: 10;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+    }
+    .title-bar {
+      cursor: move;
+      font-weight: bold;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 6px;
+      border-radius: 4px;
+    }
+    .panel-content label {
+      display: block;
+      margin: 8px 0 4px;
+    }
+    .panel-content input[type="range"],
+    .panel-content input[type="color"],
+    .panel-content input[type="text"] {
+      width: 100%;
+    }
+    .panel-content input[type="checkbox"] {
+      margin-right: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <div id="topBar">
+    <button id="btnLoadScene">🎬 Load Scene</button>
+  </div>
+
+  <!-- Scene Canvas -->
+  <canvas id="sceneCanvas"></canvas>
+
+  <!-- Lighting Panel -->
+  <div class="floating-panel" style="top: 70px; left: 10px;">
+    <div class="title-bar">💡 Lighting</div>
+    <div class="panel-content">
+      <label>Ambient Light</label>
+      <input type="range" id="ambientLight" min="0" max="2" step="0.1" value="0.5">
+
+      <label>Directional Light</label>
+      <input type="range" id="directionalLight" min="0" max="3" step="0.1" value="1.0">
+
+      <label>Background Color</label>
+      <input type="color" id="bgColor" value="#111111">
+    </div>
+  </div>
+
+  <!-- Object Properties Panel -->
+  <div class="floating-panel" style="top: 70px; right: 10px;">
+    <div class="title-bar">📦 Object Properties</div>
+    <div class="panel-content">
+      <label>Color</label>
+      <input type="color" id="objColor" value="#ff00ff">
+
+      <label>Metalness</label>
+      <input type="range" id="objMetal" min="0" max="1" step="0.01" value="1">
+
+      <label>Roughness</label>
+      <input type="range" id="objRough" min="0" max="1" step="0.01" value="0">
+    </div>
+  </div>
+
+  <!-- Audio & Animation Panel -->
+  <div class="floating-panel" style="bottom: 20px; right: 10px;">
+    <div class="title-bar">🎵 Audio & Animation</div>
+    <div class="panel-content">
+      <label>Audio Source URL</label>
+      <input type="text" id="audioUrl" placeholder="Leave empty for mic input">
+
+      <label><input type="checkbox" id="enableRotation" checked> Animate Rotation</label>
+      <label><input type="checkbox" id="enableScale" checked> Animate Scale</label>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script type="module" src="main.js"></script>
+</body>
+</html>
+
