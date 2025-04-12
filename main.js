@@ -11,6 +11,8 @@ const geomParams = ['radius', 'tube', 'tubularSegments', 'radialSegments', 'p', 
 const freqBands = ['lows', 'mids', 'highs'];
 const modulations = {};
 
+// INIT 
+
 init();
 
 function init() {
@@ -18,6 +20,26 @@ function init() {
   initDraggables();
   bindUI();
 
+  // SETUP UI TOGGLE
+  let uiVisible = true;
+
+  function toggleFloatingPanels() {
+    const panels = document.querySelectorAll('.floating-panel');
+    panels.forEach(panel => {
+      panel.style.display = uiVisible ? 'none' : 'block';
+    });
+    uiVisible = !uiVisible;
+  }
+  window.addEventListener('keydown', (e) => {
+    // Avoid triggering while typing in inputs
+    const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+    if (isInput) return;
+  
+    if (e.key === 'h' || e.key === 'H') {
+      toggleFloatingPanels();
+    }
+  });
+  
   // Automatically load the scene configuration
   fetch('presets/wire.json')
     .then(res => res.json())
