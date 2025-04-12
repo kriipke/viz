@@ -63,16 +63,6 @@ function bindUI() {
 
   // 📝 Edit YAML - handled elsewhere (e.g., YAML editor)
 
-  // ANIMATION - enable rotation?
-  document.getElementById('enableRotation').addEventListener('change', e => {
-    rotateAnim = e.target.checked;
-  });
-
-  // ANIMATION - enable scaling?
-  document.getElementById('enableScale').addEventListener('change', e => {
-    scaleAnim = e.target.checked;
-  });
-
   // LIGHTING -  ambient light
   document.getElementById('ambientLight').addEventListener('input', e => {
     if (ambientLight) ambientLight.intensity = parseFloat(e.target.value);
