@@ -174,7 +174,16 @@ function animate() {
 }
 
 function loadSceneFromConfig(config) {
+  sceneConfig = JSON.parse(JSON.stringify(config)); // Deep copy for internal use
+
+  if (mesh) {
+    scene.remove(mesh);
+    mesh.geometry.dispose();
+    mesh.material.dispose();
+  }
+
   scene.background = new THREE.Color(config.background);
+
   ambientLight = new THREE.AmbientLight(config.lighting.ambient.color, config.lighting.ambient.intensity);
   directionalLight = new THREE.DirectionalLight(config.lighting.directional.color, config.lighting.directional.intensity);
   directionalLight.position.set(
@@ -182,6 +191,7 @@ function loadSceneFromConfig(config) {
     config.lighting.directional.position.y,
     config.lighting.directional.position.z
   );
+
   scene.add(ambientLight, directionalLight);
   rebuildGeometry();
 }
@@ -245,3 +255,95 @@ function updateSceneConfigFromUI() {
   sceneConfig.lighting.ambient.intensity = parseFloat(document.getElementById('ambientLight').value);
   sceneConfig.lighting.directional.intensity = parseFloat(document.getElementById('directionalLight').value);
 }
+
+// YAML Live Editor Toggle
+const yamlEditor = document.getElementById("yamlEditor");
+const yamlTextarea = document.getElementById("yamlTextarea");
+const editButton = document.getElementById("btnEditYaml");
+
+function applyDefaultConfig(config) {
+  return {
+    background: config.background || "#ff00ff",
+    lighting: {
+      ambient: {
+        color: config.lighting?.ambient?.color || "#ffffff",
+        intensity: config.lighting?.ambient?.intensity ?? 0.5
+      },
+      directional: {
+        color: config.lighting?.directional?.color || "#ffffff",
+        intensity: config.lighting?.directional?.intensity ?? 1.0,
+        position: {
+          x: config.lighting?.directional?.position?.x ?? 10,
+          y: config.lighting?.directional?.position?.y ?? 20,
+          z: config.lighting?.directional?.position?.z ?? 30
+        }
+      }
+    },
+    objects: config.objects?.length ? config.objects : [
+      {
+        id: "obj-1",
+        name: "TorusKnot",
+        visible: true,
+        type: "torusKnot",
+        transform: {
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 }
+        },
+        geometry: {
+          radius: 10,
+          tube: 3,
+          tubularSegments: 100,
+          radialSegments: 16,
+          p: 2,
+          q: 3
+        },
+        material: {
+          type: "standard",
+          color: "#ff00ff",
+          metalness: 1,
+          roughness: 0
+        },
+        animation: {}
+      }
+    ]
+  };
+}
+
+editButton.addEventListener("click", () => {
+  yamlEditor.style.display = "none"
+  if (yamlEditor.style.display === "none") {
+    try {
+      alert("filling text area")
+      updateSceneConfigFromUI();
+      yamlTextarea.value = jsyaml.dump(sceneConfig);
+      yamlEditor.style.display = "block";
+    } catch (err) {
+      alert("Could not dump sceneConfig: " + err.message);
+    }
+  } else {
+    try {
+      try {
+      const newConfig = jsyaml.load(yamlTextarea.value);
+      } catch {
+	 alert("filling text area")
+	 updateSceneConfigFromUI();
+	 yamlTextarea.value = jsyaml.dump(sceneConfig);
+         const newConfig = jsyaml.load(yamlTextarea.value);
+      }
+      if (!newConfig) { alert("no newConfig!") }
+      if (!newConfig || !newConfig.background || !newConfig.objects || !newConfig.lighting) {
+        throw new Error("Missing required keys: background, lighting, or objects");
+      }
+      sceneConfig = newConfig;
+      loadSceneFromConfig(sceneConfig);
+      yamlEditor.style.display = "none";
+    } catch (err) {
+      alert("YAML Error: " + err.message);
+    }
+  }
+});
+
+Object.defineProperty(window, 'sceneConfig', {
+  get: () => sceneConfig
+});
