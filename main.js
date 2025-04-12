@@ -712,20 +712,32 @@ function updateObjectPropertiesUI() {
       `).join("")}
     </div>
 
-    <h4>Animation</h4>
+    <div class="title-bar ui-sub-menu">Animation</div>
     <div class="panel-content">
-     <label><input type="checkbox" id="enableRotation" checked> Animate Rotation</label>
-     <label><input type="checkbox" id="enableScale" checked> Animate Scale</label>
+      <label>Audio Source URL</label>
+      <input type="text" id="audioUrl" placeholder="Leave empty for mic input">
+      <label><input type="checkbox" id="enableRotation" checked> Animate Rotation</label>
+      <label><input type="checkbox" id="enableScale" checked> Animate Scale</label>
     </div>
-    <h5>Geometry</h5>
+    <div class="title-bar">Geometry</div>
     <div id="geometryAnimations"></div>
-  `;
+  `
+  
+  panel.innerHTML = ''
+  panel.appendChild(panelContent)
+    
+  //bindObjectUIInputs(obj)
+  createGeometryAnimationUI()
+    
+  // ANIMATION - enable rotation?
+  document.getElementById('enableRotation').addEventListener('change', e => {
+    rotateAnim = e.target.checked
+  })
 
-  panel.innerHTML = '';
-  panel.appendChild(panelContent);
-
-  bindObjectUIInputs(obj);
-  createGeometryAnimationUI();
+  // ANIMATION - enable scaling?
+  document.getElementById('enableScale').addEventListener('change', e => {
+    scaleAnim = e.target.checked
+  })
 }
 
 // OBJECT PROPERTIES -  Hook Up Input Handlers
