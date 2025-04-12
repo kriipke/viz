@@ -17,6 +17,18 @@ function init() {
   initScene();
   initDraggables();
   bindUI();
+
+  // Automatically load the scene configuration
+  fetch('presets/wire.json')
+    .then(res => res.json())
+    .then(config => {
+      sceneConfig = config;
+      loadSceneFromConfig(sceneConfig);
+      setupAudio();
+    })
+    .catch(err => {
+      console.error("Failed to load scene configuration:", err);
+    });
 }
 
 function initScene() {
@@ -37,16 +49,6 @@ function initScene() {
 }
 
 function bindUI() {
-  // 🎬 Load scene from JSON
-  document.getElementById('btnLoadScene').addEventListener('click', () => {
-    fetch('sceneConfig.json')
-      .then(res => res.json())
-      .then(config => {
-        sceneConfig = config;
-        loadSceneFromConfig(sceneConfig);
-        setupAudio();
-      });
-  });
 
   // 💾 Export to YAML
   document.getElementById('btnExportYaml').addEventListener('click', () => {
@@ -59,31 +61,19 @@ function bindUI() {
     a.click();
   });
 
-  // 📁 Import from YAML
-  document.getElementById('btnImportYaml').addEventListener('click', () => {
-    const yamlText = prompt("Paste YAML configuration:");
-    try {
-      const parsed = jsyaml.load(yamlText);
-      if (!parsed || typeof parsed !== 'object') throw new Error("Invalid YAML structure");
-      sceneConfig = applyDefaultConfig(parsed);
-      loadSceneFromConfig(sceneConfig);
-    } catch (e) {
-      alert("YAML Error: " + e.message);
-    }
-  });
-
   // 📝 Edit YAML - handled elsewhere (e.g., YAML editor)
 
-  // 🎵 Animation toggles
+  // ANIMATION - enable rotation?
   document.getElementById('enableRotation').addEventListener('change', e => {
     rotateAnim = e.target.checked;
   });
 
+  // ANIMATION - enable scaling?
   document.getElementById('enableScale').addEventListener('change', e => {
     scaleAnim = e.target.checked;
   });
 
-  // 💡 Global lighting and background inputs
+  // LIGHTING -  ambient light
   document.getElementById('ambientLight').addEventListener('input', e => {
     if (ambientLight) ambientLight.intensity = parseFloat(e.target.value);
     if (sceneConfig.lighting?.ambient) {
@@ -91,6 +81,7 @@ function bindUI() {
     }
   });
 
+  // LIGHTING - directional light
   document.getElementById('directionalLight').addEventListener('input', e => {
     if (directionalLight) directionalLight.intensity = parseFloat(e.target.value);
     if (sceneConfig.lighting?.directional) {
@@ -98,6 +89,7 @@ function bindUI() {
     }
   });
 
+  // LIGHTING - background color
   document.getElementById('bgColor').addEventListener('input', e => {
     if (scene) scene.background = new THREE.Color(e.target.value);
     sceneConfig.background = e.target.value;
@@ -443,28 +435,50 @@ function setupAudio() {
 function initDraggables() {
   document.querySelectorAll('.floating-panel').forEach(panel => {
     const title = panel.querySelector('.title-bar');
-    title.onmousedown = e => {
-      const shiftX = e.clientX - panel.getBoundingClientRect().left;
-      const shiftY = e.clientY - panel.getBoundingClientRect().top;
+    let isDragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
 
-      function moveAt(pageX, pageY) {
-        panel.style.left = pageX - shiftX + 'px';
-        panel.style.top = pageY - shiftY + 'px';
-      }
+    title.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      isDragging = true;
 
-      function onMouseMove(e) {
-        moveAt(e.pageX, e.pageY);
-      }
+      const rect = panel.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
 
-      document.addEventListener('mousemove', onMouseMove);
-      title.onmouseup = () => {
-        document.removeEventListener('mousemove', onMouseMove);
-        title.onmouseup = null;
+      title.setPointerCapture(e.pointerId);
+
+      const onPointerMove = e => {
+        if (!isDragging) return;
+        panel.style.left = `${e.clientX - offsetX}px`;
+        panel.style.top = `${e.clientY - offsetY}px`;
       };
-    };
+
+      const onPointerUp = () => {
+        isDragging = false;
+        title.releasePointerCapture(e.pointerId);
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+      };
+
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', onPointerUp);
+    });
+
     title.ondragstart = () => false;
   });
 }
+
+// DRAG-AND-DROP: Implement logic to cancel the drag operation
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    // Implement logic to cancel the drag operation
+    // For example, reset the panel's position or remove event listeners
+    document.removeEventListener('pointermove', onPointerMove);
+    document.removeEventListener('pointerup', onPointerUp);
+  }
+});
 
 function updateSceneConfigFromUI() {
   if (!sceneConfig.objects || !sceneConfig.objects[0]) return;
@@ -699,6 +713,11 @@ function updateObjectPropertiesUI() {
     </div>
 
     <h4>Animation</h4>
+    <div class="panel-content">
+     <label><input type="checkbox" id="enableRotation" checked> Animate Rotation</label>
+     <label><input type="checkbox" id="enableScale" checked> Animate Scale</label>
+    </div>
+    <h5>Geometry</h5>
     <div id="geometryAnimations"></div>
   `;
 

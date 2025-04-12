@@ -1,0 +1,103 @@
+{
+  "background": "#7625ef",
+  "lighting": {
+    "ambient": {
+      "color": "#ffffff",
+      "intensity": 0.5
+    },
+    "directional": {
+      "color": "#ffffff",
+      "intensity": 1,
+      "position": {
+        "x": 10,
+        "y": 20,
+        "z": 30
+      }
+    }
+  },
+  "objects": [
+    {
+      "id": "obj-1",
+      "name": "TorusKnot",
+      "visible": true,
+      "type": "torusKnot",
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "geometry": {
+        "radius": 10,
+        "tube": 3,
+        "tubularSegments": 100,
+        "radialSegments": 16,
+        "p": 2,
+        "q": 3
+      },
+      "material": {
+        "type": "standard",
+        "color": "#d438ff",
+        "metalness": 0,
+        "roughness": 1
+      },
+      "animation": {
+        "radius": {
+          "min": 115.5,
+          "max": 270.5,
+          "bands": [
+            "lows",
+            "mids"
+          ]
+        },
+        "tube": {
+          "min": 1,
+          "max": 12.2,
+          "bands": [
+            "lows"
+          ]
+        },
+        "tubularSegments": {
+          "min": 53.7,
+          "max": 300,
+          "bands": [
+            "mids"
+          ]
+        },
+        "radialSegments": {
+          "min": 2,
+          "max": 55.2,
+          "bands": [
+            "mids"
+          ]
+        },
+        "p": {
+          "min": 12.3,
+          "max": 81.3,
+          "bands": [
+            "highs",
+            "mids"
+          ]
+        },
+        "q": {
+          "min": 2,
+          "max": 74.6,
+          "bands": [
+            "mids"
+          ]
+        }
+      }
+    }
+  ]
+}

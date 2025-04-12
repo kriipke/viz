@@ -85,7 +85,11 @@
       width: 100%;
       background: rgba(0, 0, 0, 0.85);
       display: flex;
-      justify-content: center;
+      flex-flow: inherit;
+      flex-direction: row-reverse;
+      flex-wrap: nowrap;
+      align-content: stretch;
+      justify-content: flex-start;
       padding: 10px;
       z-index: 1000;
     }
@@ -93,11 +97,11 @@
     #topBar button {
       background: #333;
       color: rgba(255, 255, 255, 0.75);
-      border: 1px solid #888;
+      border: 1px solid transparent;
       padding: 6px 12px;
       border-radius: 4px;
       margin: 0 5px;
-      cursor: pointer;
+      cursor: pointer
     }
 
     #lightingPanel {
@@ -505,9 +509,7 @@
 </head>
 <body>
   <div id="topBar">
-    <button id="btnLoadScene">🎬 Load Scene</button>
     <button id="btnExportYaml">💾 Export YAML</button>
-    <button id="btnImportYaml">📁 Import YAML</button>
     <button id="btnEditYaml">📝 Edit Code</button>
   </div>
 
@@ -546,8 +548,6 @@
     <div class="panel-content">
       <label>Audio Source URL</label>
       <input type="text" id="audioUrl" placeholder="Leave empty for mic input">
-      <label><input type="checkbox" id="enableRotation" checked> Animate Rotation</label>
-      <label><input type="checkbox" id="enableScale" checked> Animate Scale</label>
     </div>
   </div>
 
