@@ -83,18 +83,52 @@ function bindUI() {
 
 function createGeometryAnimationUI() {
   const container = document.getElementById('geometryAnimations');
+  container.innerHTML = ""; // clear if rerendering
+
+  if (!sceneConfig.objects || !sceneConfig.objects[0]) return;
+  const anim = sceneConfig.objects[0].animation ||= {};
+
   geomParams.forEach(param => {
-    const div = document.createElement('div');
-    div.classList.add('modulation-group');
-    div.innerHTML = `
+    anim[param] ||= {
+      min: parseFloat(document.getElementById(param).value),
+      max: parseFloat(document.getElementById(param).value),
+      bands: []
+    };
+
+    const group = document.createElement('div');
+    group.classList.add('modulation-group');
+    group.innerHTML = `
       <strong>${param}</strong>
-      <label>Min <input type="number" id="${param}Min" value="${document.getElementById(param).value}" step="0.1"></label>
-      <label>Max <input type="number" id="${param}Max" value="${document.getElementById(param).value}" step="0.1"></label>
+      <label>Min <input type="number" id="${param}Min" value="${anim[param].min}" step="0.1"></label>
+      <label>Max <input type="number" id="${param}Max" value="${anim[param].max}" step="0.1"></label>
       <label><input type="checkbox" id="${param}Lows"> Lows</label>
       <label><input type="checkbox" id="${param}Mids"> Mids</label>
       <label><input type="checkbox" id="${param}Highs"> Highs</label>
     `;
-    container.appendChild(div);
+    container.appendChild(group);
+
+    // Bind value updates back to sceneConfig
+    document.getElementById(`${param}Min`).addEventListener('input', e => {
+      sceneConfig.objects[0].animation[param].min = parseFloat(e.target.value);
+    });
+
+    document.getElementById(`${param}Max`).addEventListener('input', e => {
+      sceneConfig.objects[0].animation[param].max = parseFloat(e.target.value);
+    });
+
+    ['Lows', 'Mids', 'Highs'].forEach(band => {
+      const checkbox = document.getElementById(`${param}${band}`);
+      checkbox.checked = anim[param].bands.includes(band.toLowerCase());
+      checkbox.addEventListener('change', () => {
+        const bands = sceneConfig.objects[0].animation[param].bands;
+        const freq = band.toLowerCase();
+        if (checkbox.checked && !bands.includes(freq)) {
+          bands.push(freq);
+        } else {
+          sceneConfig.objects[0].animation[param].bands = bands.filter(b => b !== freq);
+        }
+      });
+    });
   });
 }
 
@@ -112,12 +146,18 @@ function getAudioBands() {
 }
 
 function getAnimatedValue(param, baseVal, bands) {
-  const min = parseFloat(document.getElementById(`${param}Min`).value);
-  const max = parseFloat(document.getElementById(`${param}Max`).value);
+  const anim = sceneConfig.objects?.[0]?.animation?.[param];
+  if (!anim) return baseVal;
+
+  const min = anim.min ?? baseVal;
+  const max = anim.max ?? baseVal;
+  const selectedBands = anim.bands || [];
+
   let modVal = 0;
-  if (document.getElementById(`${param}Lows`).checked) modVal += bands.lows;
-  if (document.getElementById(`${param}Mids`).checked) modVal += bands.mids;
-  if (document.getElementById(`${param}Highs`).checked) modVal += bands.highs;
+  selectedBands.forEach(band => {
+    modVal += bands[band] ?? 0;
+  });
+
   return min + modVal * (max - min);
 }
 
@@ -174,18 +214,30 @@ function animate() {
 }
 
 function loadSceneFromConfig(config) {
-  sceneConfig = JSON.parse(JSON.stringify(config)); // Deep copy for internal use
+  // ✅ Deep copy for in-memory sync
+  sceneConfig = JSON.parse(JSON.stringify(config));
 
+  // 🧹 Remove existing mesh
   if (mesh) {
     scene.remove(mesh);
     mesh.geometry.dispose();
     mesh.material.dispose();
+    mesh = null;
   }
 
+  // ✅ Set background
   scene.background = new THREE.Color(config.background);
+  document.getElementById('bgColor').value = config.background;
 
-  ambientLight = new THREE.AmbientLight(config.lighting.ambient.color, config.lighting.ambient.intensity);
-  directionalLight = new THREE.DirectionalLight(config.lighting.directional.color, config.lighting.directional.intensity);
+  // ✅ Setup lighting
+  ambientLight = new THREE.AmbientLight(
+    config.lighting.ambient.color,
+    config.lighting.ambient.intensity
+  );
+  directionalLight = new THREE.DirectionalLight(
+    config.lighting.directional.color,
+    config.lighting.directional.intensity
+  );
   directionalLight.position.set(
     config.lighting.directional.position.x,
     config.lighting.directional.position.y,
@@ -193,7 +245,31 @@ function loadSceneFromConfig(config) {
   );
 
   scene.add(ambientLight, directionalLight);
+
+  // ✅ Sync material UI
+  const material = config.objects[0].material;
+  document.getElementById('objColor').value = material.color;
+  document.getElementById('objMetal').value = material.metalness;
+  document.getElementById('objRough').value = material.roughness;
+
+  // ✅ Sync lighting UI
+  document.getElementById('ambientLight').value = config.lighting.ambient.intensity;
+  document.getElementById('directionalLight').value = config.lighting.directional.intensity;
+
+  // ✅ Sync geometry UI
+  const geo = config.objects[0].geometry;
+  document.getElementById('radius').value = geo.radius;
+  document.getElementById('tube').value = geo.tube;
+  document.getElementById('tubularSegments').value = geo.tubularSegments;
+  document.getElementById('radialSegments').value = geo.radialSegments;
+  document.getElementById('p').value = geo.p;
+  document.getElementById('q').value = geo.q;
+
+  // ✅ Rebuild mesh with synced inputs
   rebuildGeometry();
+
+  // ✅ Rebuild animation UI now that DOM inputs match config
+  createGeometryAnimationUI();
 }
 
 function setupAudio() {
@@ -310,11 +386,113 @@ function applyDefaultConfig(config) {
   };
 }
 
+// YAML EDITOR - Setup debounce and helpers
+
+let debounceTimer;
+
+function debounce(fn, delay = 500) {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(fn, delay);
+}
+
+function safeParseYaml(text) {
+  try {
+    const parsed = jsyaml.load(text);
+    if (!parsed || typeof parsed !== 'object') throw new Error("Invalid YAML structure");
+    return applyDefaultConfig(parsed);
+  } catch (e) {
+    yamlStatus.textContent = `YAML Error: ${e.message}`;
+    return null;
+  }
+}
+
+function diffConfigs(current, edited) {
+  const diffs = [];
+  const checkDiff = (a, b, path = "") => {
+    if (typeof a !== typeof b || JSON.stringify(a) !== JSON.stringify(b)) {
+      diffs.push(`${path}: ${JSON.stringify(a)} → ${JSON.stringify(b)}`);
+    }
+  };
+
+  function recurse(obj1, obj2, prefix = "") {
+    const keys = new Set([...Object.keys(obj1 || {}), ...Object.keys(obj2 || {})]);
+    keys.forEach(k => {
+      const val1 = obj1?.[k];
+      const val2 = obj2?.[k];
+      if (typeof val1 === 'object' && typeof val2 === 'object') {
+        recurse(val1, val2, `${prefix}${k}.`);
+      } else {
+        checkDiff(val1, val2, `${prefix}${k}`);
+      }
+    });
+  }
+
+  recurse(current, edited);
+  return diffs;
+}
+
+// YAML EDITOR -Live Preview with Debounce on YAML Input
+yamlTextarea.addEventListener("input", () => {
+  debounce(() => {
+    const previewConfig = safeParseYaml(yamlTextarea.value);
+    if (previewConfig) {
+      yamlStatus.textContent = "✔ Live preview applied";
+      sceneConfig = previewConfig;
+      loadSceneFromConfig(sceneConfig);
+      createGeometryAnimationUI();
+    }
+  }, 600);
+});
+
+// YAML EDITOR - "Edit Code” Button (Toggle open)
+document.getElementById("btnEditYaml").addEventListener("click", () => {
+  updateSceneConfigFromUI();
+  yamlTextarea.value = jsyaml.dump(sceneConfig);
+  yamlEditor.style.display = "block";
+  yamlStatus.textContent = "YAML loaded from scene";
+});
+
+
+// YAML EDITOR - Validate Button
+document.getElementById("btnValidateYaml").addEventListener("click", () => {
+  const parsed = safeParseYaml(yamlTextarea.value);
+  if (parsed) yamlStatus.textContent = "✅ Valid YAML";
+});
+
+// YAML EDITOR - Show diff button
+document.getElementById("btnShowDiff").addEventListener("click", () => {
+  const parsed = safeParseYaml(yamlTextarea.value);
+  if (!parsed) return;
+  const diffs = diffConfigs(sceneConfig, parsed);
+  if (diffs.length === 0) {
+    yamlStatus.textContent = "No differences from current scene.";
+  } else {
+    alert("Changes:\n\n" + diffs.join("\n"));
+  }
+});
+
+// YAML EDITOR - Apply YAML Button
+document.getElementById("btnApplyYaml").addEventListener("click", () => {
+  const parsed = safeParseYaml(yamlTextarea.value);
+  if (!parsed) return;
+  sceneConfig = parsed;
+  loadSceneFromConfig(sceneConfig);
+  createGeometryAnimationUI();
+  updateSceneConfigFromUI();
+  yamlEditor.style.display = "none";
+  yamlStatus.textContent = "";
+});
+
+// YAML EDITOR - Close Button
+document.getElementById("btnCloseYaml").addEventListener("click", () => {
+  yamlEditor.style.display = "none";
+  yamlStatus.textContent = "";
+});
+
 editButton.addEventListener("click", () => {
   yamlEditor.style.display = "none"
   if (yamlEditor.style.display === "none") {
     try {
-      alert("filling text area")
       updateSceneConfigFromUI();
       yamlTextarea.value = jsyaml.dump(sceneConfig);
       yamlEditor.style.display = "block";
@@ -347,3 +525,5 @@ editButton.addEventListener("click", () => {
 Object.defineProperty(window, 'sceneConfig', {
   get: () => sceneConfig
 });
+
+

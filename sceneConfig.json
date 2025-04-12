@@ -1,13 +1,13 @@
 {
-  "background": "#ff00ff",
+  "background": "#8bf893",
   "lighting": {
     "ambient": {
       "color": "#ffffff",
-      "intensity": 0.5
+      "intensity": 2
     },
     "directional": {
       "color": "#ffffff",
-      "intensity": 1.0,
+      "intensity": 3,
       "position": {
         "x": 10,
         "y": 20,
@@ -22,9 +22,21 @@
       "visible": true,
       "type": "torusKnot",
       "transform": {
-        "position": { "x": 0, "y": 0, "z": 0 },
-        "rotation": { "x": 0, "y": 0, "z": 0 },
-        "scale": { "x": 1, "y": 1, "z": 1 }
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
       },
       "geometry": {
         "radius": 10,
@@ -36,12 +48,56 @@
       },
       "material": {
         "type": "standard",
-        "color": "#ff00ff",
-        "metalness": 1,
-        "roughness": 0
+        "color": "#d438ff",
+        "metalness": 0,
+        "roughness": 1
       },
-      "animation": {}
+      "animation": {
+        "radius": {
+          "min": 19,
+          "max": 69,
+          "bands": [
+            "lows",
+            "mids"
+          ]
+        },
+        "tube": {
+          "min": 1,
+          "max": 23,
+          "bands": [
+            "lows"
+          ]
+        },
+        "tubularSegments": {
+          "min": 1,
+          "max": 299,
+          "bands": [
+            "lows"
+          ]
+        },
+        "radialSegments": {
+          "min": 2,
+          "max": 200,
+          "bands": [
+            "mids"
+          ]
+        },
+        "p": {
+          "min": 0.1,
+          "max": 2,
+          "bands": [
+            "highs",
+            "mids"
+          ]
+        },
+        "q": {
+          "min": 100,
+          "max": 400,
+          "bands": [
+            "mids"
+          ]
+        }
+      }
     }
   ]
 }
-
