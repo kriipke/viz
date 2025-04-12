@@ -292,9 +292,18 @@ function animate() {
       values[p] = getAnimatedValue(p, parseFloat(document.getElementById(p).value), bands);
     });
     const newGeo = new THREE.TorusKnotGeometry(values.radius, values.tube, values.tubularSegments, values.radialSegments, values.p, values.q);
-    mesh.geometry.dispose();
-    mesh.geometry = newGeo;
 
+    if (mesh.geometry.parameters) {
+      Object.assign(mesh.geometry.parameters, values);
+      mesh.geometry = new THREE.TorusKnotGeometry(
+        values.radius, values.tube, values.tubularSegments,
+        values.radialSegments, values.p, values.q
+      );
+    } else {
+      mesh.geometry.dispose();
+      mesh.geometry = newGeo;
+    }
+    
     // Rotation and scale
     if (rotateAnim) {
       mesh.rotation.y += 0.01 + bands.mids * 0.05;
