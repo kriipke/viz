@@ -4,6 +4,8 @@ let scene, camera, renderer, ambientLight, directionalLight, mesh;
 let audioCtx, analyser, dataArray;
 let rotateAnim = true, scaleAnim = true;
 let sceneConfig = {};
+let selectedObjectIndex = 0;
+
 
 const geomParams = ['radius', 'tube', 'tubularSegments', 'radialSegments', 'p', 'q'];
 const freqBands = ['lows', 'mids', 'highs'];
@@ -15,7 +17,6 @@ function init() {
   initScene();
   initDraggables();
   bindUI();
-  createGeometryAnimationUI();
 }
 
 function initScene() {
@@ -36,16 +37,18 @@ function initScene() {
 }
 
 function bindUI() {
+  // 🎬 Load scene from JSON
   document.getElementById('btnLoadScene').addEventListener('click', () => {
     fetch('sceneConfig.json')
       .then(res => res.json())
       .then(config => {
         sceneConfig = config;
-        loadSceneFromConfig(config);
+        loadSceneFromConfig(sceneConfig);
         setupAudio();
       });
   });
 
+  // 💾 Export to YAML
   document.getElementById('btnExportYaml').addEventListener('click', () => {
     updateSceneConfigFromUI();
     const yamlText = jsyaml.dump(sceneConfig);
@@ -56,81 +59,154 @@ function bindUI() {
     a.click();
   });
 
+  // 📁 Import from YAML
   document.getElementById('btnImportYaml').addEventListener('click', () => {
     const yamlText = prompt("Paste YAML configuration:");
     try {
-      sceneConfig = jsyaml.load(yamlText);
+      const parsed = jsyaml.load(yamlText);
+      if (!parsed || typeof parsed !== 'object') throw new Error("Invalid YAML structure");
+      sceneConfig = applyDefaultConfig(parsed);
       loadSceneFromConfig(sceneConfig);
     } catch (e) {
-      alert("Invalid YAML");
+      alert("YAML Error: " + e.message);
     }
   });
 
-  document.getElementById('enableRotation').addEventListener('change', e => rotateAnim = e.target.checked);
-  document.getElementById('enableScale').addEventListener('change', e => scaleAnim = e.target.checked);
+  // 📝 Edit YAML - handled elsewhere (e.g., YAML editor)
 
-  document.getElementById('ambientLight').addEventListener('input', e => ambientLight.intensity = parseFloat(e.target.value));
-  document.getElementById('directionalLight').addEventListener('input', e => directionalLight.intensity = parseFloat(e.target.value));
-  document.getElementById('bgColor').addEventListener('input', e => scene.background = new THREE.Color(e.target.value));
-  document.getElementById('objColor').addEventListener('input', e => mesh.material.color.set(e.target.value));
-  document.getElementById('objMetal').addEventListener('input', e => mesh.material.metalness = parseFloat(e.target.value));
-  document.getElementById('objRough').addEventListener('input', e => mesh.material.roughness = parseFloat(e.target.value));
+  // 🎵 Animation toggles
+  document.getElementById('enableRotation').addEventListener('change', e => {
+    rotateAnim = e.target.checked;
+  });
 
-  geomParams.forEach(param => {
-    document.getElementById(param).addEventListener('input', () => rebuildGeometry());
+  document.getElementById('enableScale').addEventListener('change', e => {
+    scaleAnim = e.target.checked;
+  });
+
+  // 💡 Global lighting and background inputs
+  document.getElementById('ambientLight').addEventListener('input', e => {
+    if (ambientLight) ambientLight.intensity = parseFloat(e.target.value);
+    if (sceneConfig.lighting?.ambient) {
+      sceneConfig.lighting.ambient.intensity = parseFloat(e.target.value);
+    }
+  });
+
+  document.getElementById('directionalLight').addEventListener('input', e => {
+    if (directionalLight) directionalLight.intensity = parseFloat(e.target.value);
+    if (sceneConfig.lighting?.directional) {
+      sceneConfig.lighting.directional.intensity = parseFloat(e.target.value);
+    }
+  });
+
+  document.getElementById('bgColor').addEventListener('input', e => {
+    if (scene) scene.background = new THREE.Color(e.target.value);
+    sceneConfig.background = e.target.value;
   });
 }
 
+
 function createGeometryAnimationUI() {
   const container = document.getElementById('geometryAnimations');
-  container.innerHTML = ""; // clear if rerendering
+  if (!container) {
+    console.warn("createGeometryAnimationUI: #geometryAnimations not found yet.");
+    return;
+  }
+
+  container.innerHTML = "";
 
   if (!sceneConfig.objects || !sceneConfig.objects[0]) return;
-  const anim = sceneConfig.objects[0].animation ||= {};
+  const obj = sceneConfig.objects[selectedObjectIndex];
+  const anim = obj.animation ||= {};
 
   geomParams.forEach(param => {
+    const anim = obj.animation ||= {};
     anim[param] ||= {
-      min: parseFloat(document.getElementById(param).value),
-      max: parseFloat(document.getElementById(param).value),
+      min: parseFloat(obj.geometry[param]),
+      max: parseFloat(obj.geometry[param]),
       bands: []
     };
 
     const group = document.createElement('div');
     group.classList.add('modulation-group');
     group.innerHTML = `
-      <strong>${param}</strong>
-      <label>Min <input type="number" id="${param}Min" value="${anim[param].min}" step="0.1"></label>
-      <label>Max <input type="number" id="${param}Max" value="${anim[param].max}" step="0.1"></label>
-      <label><input type="checkbox" id="${param}Lows"> Lows</label>
-      <label><input type="checkbox" id="${param}Mids"> Mids</label>
-      <label><input type="checkbox" id="${param}Highs"> Highs</label>
+      <div class="mod-header" data-param="${param}">
+        <strong class="toggle-trigger">${param}</strong>
+        <span class="toggle-icon">▲</span>
+      </div>
+      <div class="mod-content" id="${param}ModContent" style="display: block;">
+        <label class="range-values">
+          <span id="${param}MinLabel">${anim[param].min}</span> →
+          <span id="${param}MaxLabel">${anim[param].max}</span>
+        </label>
+        <div class="noui-slider-wrapper slider-round">
+          <div class="noui-range" id="${param}Slider"></div>
+        </div>
+        <div class="mod-checkboxes">
+          <label><input type="checkbox" id="${param}Lows"> Lows</label>
+          <label><input type="checkbox" id="${param}Mids"> Mids</label>
+          <label><input type="checkbox" id="${param}Highs"> Highs</label>
+        </div>
+      </div>
     `;
+
     container.appendChild(group);
 
-    // Bind value updates back to sceneConfig
-    document.getElementById(`${param}Min`).addEventListener('input', e => {
-      sceneConfig.objects[0].animation[param].min = parseFloat(e.target.value);
+
+    // Initialize noUiSlider
+    const slider = document.getElementById(`${param}Slider`);
+    noUiSlider.create(slider, {
+      start: [anim[param].min, anim[param].max],
+      connect: true,
+      range: {
+        min: 0,
+        max: 300
+      },
+      step: 0.1,
+      tooltips: [false, false],
+      format: {
+        to: v => parseFloat(v).toFixed(1),
+        from: v => parseFloat(v)
+      }
     });
 
-    document.getElementById(`${param}Max`).addEventListener('input', e => {
-      sceneConfig.objects[0].animation[param].max = parseFloat(e.target.value);
+    slider.parentElement.classList.add('slider-round');
+
+    slider.noUiSlider.on('update', (values) => {
+      anim[param].min = parseFloat(values[0]);
+      anim[param].max = parseFloat(values[1]);
+      document.getElementById(`${param}MinLabel`).textContent = values[0];
+      document.getElementById(`${param}MaxLabel`).textContent = values[1];
     });
 
+    // Collapse toggle
+    const toggleLabel = group.querySelector('.toggle-trigger');
+    const toggleIcon = group.querySelector('.toggle-icon');
+    const modContent = group.querySelector('.mod-content');
+
+    toggleLabel.addEventListener('click', () => {
+      const isVisible = modContent.style.display === 'block';
+      modContent.style.display = isVisible ? 'none' : 'block';
+      toggleIcon.textContent = isVisible ? '▼' : '▲';
+    });
+
+    // Checkboxes
     ['Lows', 'Mids', 'Highs'].forEach(band => {
       const checkbox = document.getElementById(`${param}${band}`);
       checkbox.checked = anim[param].bands.includes(band.toLowerCase());
       checkbox.addEventListener('change', () => {
-        const bands = sceneConfig.objects[0].animation[param].bands;
-        const freq = band.toLowerCase();
-        if (checkbox.checked && !bands.includes(freq)) {
-          bands.push(freq);
+        const bands = anim[param].bands;
+        const key = band.toLowerCase();
+        if (checkbox.checked && !bands.includes(key)) {
+          bands.push(key);
         } else {
-          sceneConfig.objects[0].animation[param].bands = bands.filter(b => b !== freq);
+          anim[param].bands = bands.filter(b => b !== key);
         }
       });
     });
   });
 }
+
+
 
 function getBandAverage(start, end) {
   const slice = dataArray.slice(start, end);
@@ -162,25 +238,63 @@ function getAnimatedValue(param, baseVal, bands) {
 }
 
 function rebuildGeometry() {
+  const obj = sceneConfig.objects[selectedObjectIndex];
+
+  // Remove the existing mesh
   if (mesh) {
     scene.remove(mesh);
     mesh.geometry.dispose();
     mesh.material.dispose();
+    mesh = null;
   }
 
-  const values = {};
-  geomParams.forEach(p => values[p] = parseFloat(document.getElementById(p).value));
-
-  const geometry = new THREE.TorusKnotGeometry(values.radius, values.tube, values.tubularSegments, values.radialSegments, values.p, values.q);
-  const material = new THREE.MeshStandardMaterial({
-    color: document.getElementById('objColor').value,
-    metalness: parseFloat(document.getElementById('objMetal').value),
-    roughness: parseFloat(document.getElementById('objRough').value)
+  // Sync geometry inputs → config
+  geomParams.forEach(p => {
+    const input = document.getElementById(p);
+    if (input) {
+      obj.geometry[p] = parseFloat(input.value);
+    }
   });
 
+  // Create geometry and material
+  const geometry = new THREE.TorusKnotGeometry(
+    obj.geometry.radius,
+    obj.geometry.tube,
+    obj.geometry.tubularSegments,
+    obj.geometry.radialSegments,
+    obj.geometry.p,
+    obj.geometry.q
+  );
+
+  const material = new THREE.MeshStandardMaterial({
+    color: obj.material.color,
+    metalness: obj.material.metalness,
+    roughness: obj.material.roughness
+  });
+
+  // Create mesh and add to scene
   mesh = new THREE.Mesh(geometry, material);
-  mesh.position.set(0, 0, 0);
+  mesh.position.set(
+    obj.transform.position.x,
+    obj.transform.position.y,
+    obj.transform.position.z
+  );
+  mesh.rotation.set(
+    obj.transform.rotation.x,
+    obj.transform.rotation.y,
+    obj.transform.rotation.z
+  );
+  mesh.scale.set(
+    obj.transform.scale.x,
+    obj.transform.scale.y,
+    obj.transform.scale.z
+  );
+
   scene.add(mesh);
+
+  // Sync Mesh Visibility
+  mesh.visible = obj.visible !== false;
+
 }
 
 function animate() {
@@ -225,52 +339,83 @@ function loadSceneFromConfig(config) {
     mesh = null;
   }
 
-  // ✅ Set background
-  scene.background = new THREE.Color(config.background);
-  document.getElementById('bgColor').value = config.background;
+  // ✅ Set scene background from config
+  scene.background = new THREE.Color(sceneConfig.background);
 
-  // ✅ Setup lighting
+  // ✅ Create and add lights
   ambientLight = new THREE.AmbientLight(
-    config.lighting.ambient.color,
-    config.lighting.ambient.intensity
+    sceneConfig.lighting.ambient.color,
+    sceneConfig.lighting.ambient.intensity
   );
   directionalLight = new THREE.DirectionalLight(
-    config.lighting.directional.color,
-    config.lighting.directional.intensity
+    sceneConfig.lighting.directional.color,
+    sceneConfig.lighting.directional.intensity
   );
   directionalLight.position.set(
-    config.lighting.directional.position.x,
-    config.lighting.directional.position.y,
-    config.lighting.directional.position.z
+    sceneConfig.lighting.directional.position.x,
+    sceneConfig.lighting.directional.position.y,
+    sceneConfig.lighting.directional.position.z
   );
 
   scene.add(ambientLight, directionalLight);
 
-  // ✅ Sync material UI
-  const material = config.objects[0].material;
-  document.getElementById('objColor').value = material.color;
-  document.getElementById('objMetal').value = material.metalness;
-  document.getElementById('objRough').value = material.roughness;
+  // ✅ Update object selector dropdown
+  populateObjectSelector();
 
-  // ✅ Sync lighting UI
-  document.getElementById('ambientLight').value = config.lighting.ambient.intensity;
-  document.getElementById('directionalLight').value = config.lighting.directional.intensity;
+  // ✅ Update all object-specific inputs
+  updateObjectPropertiesUI();
 
-  // ✅ Sync geometry UI
-  const geo = config.objects[0].geometry;
-  document.getElementById('radius').value = geo.radius;
-  document.getElementById('tube').value = geo.tube;
-  document.getElementById('tubularSegments').value = geo.tubularSegments;
-  document.getElementById('radialSegments').value = geo.radialSegments;
-  document.getElementById('p').value = geo.p;
-  document.getElementById('q').value = geo.q;
-
-  // ✅ Rebuild mesh with synced inputs
+  // ✅ Build mesh based on current object
   rebuildGeometry();
-
-  // ✅ Rebuild animation UI now that DOM inputs match config
-  createGeometryAnimationUI();
 }
+
+
+function populateObjectSelector() {
+  const container = document.getElementById('layerList');
+  container.innerHTML = "";
+
+  sceneConfig.objects.forEach((obj, index) => {
+    const div = document.createElement('div');
+    div.classList.add('layer-entry');
+    if (index === selectedObjectIndex) div.classList.add('active');
+
+    // Layer name
+    const nameSpan = document.createElement('span');
+    nameSpan.classList.add('layer-name');
+    nameSpan.textContent = obj.name || obj.id || `Object ${index}`;
+
+    // Eye icon
+    const eyeSpan = document.createElement('span');
+    eyeSpan.classList.add('layer-eye');
+    eyeSpan.innerHTML = obj.visible !== false ? '👁' : '🚫';
+
+    // Click to select layer
+    div.addEventListener('click', () => {
+      selectedObjectIndex = index;
+      updateObjectPropertiesUI();
+      rebuildGeometry();
+      populateObjectSelector(); // Refresh UI to show active
+    });
+
+    // Click to toggle visibility
+    eyeSpan.addEventListener('click', e => {
+      e.stopPropagation(); // Don't trigger parent click
+      const current = sceneConfig.objects[index].visible !== false;
+      sceneConfig.objects[index].visible = !current;
+      eyeSpan.innerHTML = current ? '🚫' : '👁';
+
+      // Remove or hide from scene
+      if (mesh && index === selectedObjectIndex) {
+        mesh.visible = !current;
+      }
+    });
+
+    div.appendChild(nameSpan);
+    div.appendChild(eyeSpan);
+    container.appendChild(div);
+  });
+}
+
 
 function setupAudio() {
   const url = document.getElementById('audioUrl').value;
@@ -526,4 +671,73 @@ Object.defineProperty(window, 'sceneConfig', {
   get: () => sceneConfig
 });
 
+
+// Render Object Properties <div>
+function updateObjectPropertiesUI() {
+  const panel = document.getElementById('objectPropertiesPanel');
+  const obj = sceneConfig.objects[selectedObjectIndex];
+  const geo = obj.geometry;
+  const mat = obj.material;
+
+  const panelContent = document.createElement('div');
+  panelContent.className = 'panel-content';
+
+  panelContent.innerHTML = `
+    <h4>Surface</h4>
+    <label>Color <input type="color" id="objColor" value="${mat.color}"></label>
+    <label>Metalness <input type="range" id="objMetal" min="0" max="1" step="0.01" value="${mat.metalness}"></label>
+    <label>Roughness <input type="range" id="objRough" min="0" max="1" step="0.01" value="${mat.roughness}"></label>
+
+    <h4>Geometry</h4>
+    <div class="geometry-grid">
+      ${geomParams.map(p => `
+        <div class="geom-row">
+          <label for="${p}">${p}</label>
+          <input type="number" id="${p}" value="${geo[p]}" step="0.1">
+        </div>
+      `).join("")}
+    </div>
+
+    <h4>Animation</h4>
+    <div id="geometryAnimations"></div>
+  `;
+
+  panel.innerHTML = '';
+  panel.appendChild(panelContent);
+
+  bindObjectUIInputs(obj);
+  createGeometryAnimationUI();
+}
+
+// OBJECT PROPERTIES -  Hook Up Input Handlers
+function bindObjectUIInputs(obj) {
+  document.getElementById('objColor').addEventListener('input', e => {
+    obj.material.color = e.target.value;
+    mesh.material.color.set(e.target.value);
+  });
+
+  document.getElementById('objMetal').addEventListener('input', e => {
+    obj.material.metalness = parseFloat(e.target.value);
+    mesh.material.metalness = obj.material.metalness;
+  });
+
+  document.getElementById('objRough').addEventListener('input', e => {
+    obj.material.roughness = parseFloat(e.target.value);
+    mesh.material.roughness = obj.material.roughness;
+  });
+
+  geomParams.forEach(p => {
+    document.getElementById(p).addEventListener('input', () => {
+      obj.geometry[p] = parseFloat(document.getElementById(p).value);
+      rebuildGeometry();
+    });
+  });
+}
+
+// // OBJECT SELECTION - handle layer selection
+// document.getElementById('objectSelector').addEventListener('change', e => {
+//   selectedObjectIndex = parseInt(e.target.value);
+//   updateObjectPropertiesUI();
+//   rebuildGeometry();
+// });
 

@@ -1,11 +1,84 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>3D Visualizer UI</title>
   <style>
-    body { margin: 0; background: none; font-family: sans-serif; color: white; overflow: hidden; }
-    canvas { display: block; }
+    /* http://meyerweb.com/eric/tools/css/reset/ 
+       v2.0 | 20110126
+       License: none (public domain)
+    */
+
+    html, body, div, span, applet, object, iframe,
+    h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+    a, abbr, acronym, address, big, cite, code,
+    del, dfn, em, img, ins, kbd, q, s, samp,
+    small, strike, strong, sub, sup, tt, var,
+    b, u, i, center,
+    dl, dt, dd, ol, ul, li,
+    fieldset, form, label, legend,
+    table, caption, tbody, tfoot, thead, tr, th, td,
+    article, aside, canvas, details, embed, 
+    figure, figcaption, footer, header, hgroup, 
+    menu, nav, output, ruby, section, summary,
+    time, mark, audio, video {
+	    margin: 0;
+	    padding: 0;
+	    border: 0;
+	    font-size: 100%;
+	    font: inherit;
+	    vertical-align: baseline;
+    }
+    /* HTML5 display-role reset for older browsers */
+    article, aside, details, figcaption, figure, 
+    footer, header, hgroup, menu, nav, section {
+	    display: block;
+    }
+    body {
+	    line-height: 1;
+    }
+    ol, ul {
+	    list-style: none;
+    }
+    blockquote, q {
+	    quotes: none;
+    }
+    blockquote:before, blockquote:after,
+    q:before, q:after {
+	    content: '';
+	    content: none;
+    }
+    table {
+	    border-collapse: collapse;
+	    border-spacing: 0;
+    }
+
+    :root {
+      --bg-panel: rgba(30, 30, 30, 0.9);
+      --bg-highlight: rgba(80, 80, 80, 0.3);
+      --border-soft: rgba(255, 255, 255, 0.08);
+      --text-main: rgba(255, 255, 255, 0.87);
+      --bg-form: rgba(0, 0, 0, 0.47);
+      --bg-button: rgba(144, 144, 144, 0.7);
+      --text-muted: rgba(255, 255, 255, 0.6);
+      --accent: #ff00ff;
+      --accent-bg: rgba(143, 106, 255, 0.15);
+      --border-radius: 8px;
+      --transition-fast: all 0.2s ease-in-out;
+      --font-ui: 'Inter', system-ui, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: #0d0d0d;
+      font-family: var(--font-ui);
+      color: var(--text-main);
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+    }
+
     #topBar {
       position: fixed;
       top: 0;
@@ -16,6 +89,7 @@
       padding: 10px;
       z-index: 1000;
     }
+
     #topBar button {
       background: #333;
       color: rgba(255, 255, 255, 0.75);
@@ -25,73 +99,409 @@
       margin: 0 5px;
       cursor: pointer;
     }
+
+    #lightingPanel {
+      top: 10px;
+      left: 10px;
+      height: max-content;
+      width: min(300px, max-content);
+    }
+
+    #objectPanel {
+      top: 10px;
+      right: 10px;
+    }
+
+    #layersPanel {
+      top: 50%;
+      left: 10px;
+      width: min(300px, max-content);
+    }
+
+    #audioPanel {
+      bottom: 10px;
+      right: 10px;
+    }
+    /* Floating Menus */
     .floating-panel {
       position: absolute;
-      background: rgba(0, 0, 0, 0.6);
-      padding: 10px;
-      border-radius: 8px;
+      background: var(--bg-panel);
+      backdrop-filter: blur(10px);
+      padding: 12px 14px;
+      border-radius: var(--border-radius);
       max-width: 340px;
       max-height: 90vh;
       overflow-y: auto;
       z-index: 10;
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+      border: 1px solid var(--border-soft);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+      transition: var(--transition-fast);
     }
+
+    /* Menu titles */
     .title-bar {
       cursor: move;
       font-weight: bold;
-      margin-bottom: 10px;
-      background: rgba(255, 255, 255, 0.1);
+      font-size: 15px;
+      margin-bottom: 12px;
+      background: rgba(255, 255, 255, 0.08);
       padding: 6px;
       border-radius: 4px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-soft);
     }
+
+    /* Panel labels */
     .panel-content label {
       display: block;
+      font-size: 12px;
       margin: 8px 0 4px;
+      color: var(--text-muted);
     }
+
     .panel-content input[type="range"],
     .panel-content input[type="color"],
     .panel-content input[type="text"],
     .panel-content input[type="number"] {
       width: 100%;
-      background: rgba(255,255,255,0.4);
-      color: rgba(255,255,255,0.8);
-      accent-color: rgba(0, 0, 0, 0.4);
-      background-color: #00000036;
-      color: white;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border: none;
+      padding: 6px 8px;
+      border-radius: var(--border-radius);
+      font-size: 13px;
     }
+
     .panel-content input[type="checkbox"] {
       margin-right: 4px;
+      accent-color: rgba(255,255,255,0.01);
     }
+    .panel-content input[type="checkbox"]:checked::before {
+      margin-right: 4px;
+      accent-color: rgba(255,255,255,0.05);
+      background-color: rgba(255,255,255,0.01);
+    }
+
+    /* Layer Panel */
+    .layer-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border-soft);
+      cursor: pointer;
+      transition: background 0.2s;
+      border-radius: 4px;
+    }
+
+    .layer-entry:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .layer-entry.active {
+      background: var(--accent-bg);
+      color: var(--accent);
+    }
+
+    .layer-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .layer-eye {
+      width: 20px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    /* Mod group containers */
     .modulation-group {
-      margin-bottom: 12px;
-      border-bottom: 1px solid #444;
-      padding-bottom: 8px;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-soft);
     }
+
+    .mod-header {
+      font-weight: 500;
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
+    .toggle-icon {
+      font-size: 12px;
+      color: var(--text-muted);
+      transition: var(--transition-fast);
+    }
+
+    .toggle-trigger {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* YAML Editor */
     #yamlEditor {
       position: fixed;
       bottom: 0;
       left: 0;
       width: 100%;
       height: 30vh;
-      background: rgba(0,0,0,0.6);
+      background: rgba(0, 0, 0, 0.6);
       color: #ccc;
       display: none;
       z-index: 1001;
       border-top: 2px solid #666;
     }
+
     #yamlEditor textarea {
       width: 100%;
       height: 100%;
       background: transparent;
-      color: rgba(255,255,255,0.8);
+      color: rgba(255, 255, 255, 0.8);
       font-family: monospace;
       font-size: 14px;
       border: none;
       padding: 10px;
       resize: none;
     }
+
+    /* Geometry section */
+    .geometry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 12px;
+    }
+
+    .geom-row {
+      display: flex;
+      flex-direction: column;
+      font-size: 13px;
+    }
+
+    .geom-row label {
+      font-size: 12px;
+      margin-bottom: 2px;
+      color: #ccc;
+    }
+
+    /* Slider section */
+    .range-wrapper {
+      position: relative;
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+      margin-bottom: 4px;
+    }
+
+
+    .range-values {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-align: right;
+      padding-right: 4px;
+    }
+
+    /* 🎚 Native Sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      background: #444;
+      border-radius: 4px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 14px;
+      width: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: inset 0 1px 1px #F0F0F0,0 3px 6px -5px #BBB;
+      transition: background 0.2s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #5cf;
+      box-shadow: 0 0 6px #5cf;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      height: 14px;
+      width: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 4px var(--accent);
+      transition: background 0.2s;
+    }
+
+    input[type="range"]::-moz-range-thumb:hover {
+      background: #5cf;
+      box-shadow: 0 0 6px #5cf;
+    }
+
+    .noUi-base, .noUi-connects {
+      background: var(--bg-form);
+      background-color: rgb(255 255 255 / 3%);
+    }
+    /* 🎛 noUiSlider */
+    .noUi-slider-wrapper {
+     padding: 0;
+     border: 0;
+     padding-top: 0.5rem;
+     padding-bottom: 0.5rem;
+     padding-left: 0.5rem;
+     padding-right: 0.5rem;
+    }
+
+
+    /* Fix layout spacing of checkboxes under each slider */
+    .mod-checkboxes {
+      display: flex;
+      gap: 12px;
+      margin-top: 6px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .mod-checkboxes label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Ensure noUi sliders fill their container and align visually */
+    .noUi-target {
+      width: 100%;
+      height: 6px;
+      background: var(--bg-form);
+      border: !important 1px solid transparent;
+      box-shadow: inset 0 1px 1px #F0F0F0,0 3px 6px -5px #BBB;
+      border-radius: 3px;
+    }
+
+    /* Fix for noUiSlider filled track color */
+    .noUi-connect {
+      background: var(--accent);
+    }
+
+    .noUi-tooltip {
+      font-size: 11px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-top: 4px;
+    }
+
+    .noUi-touch-area {
+       background: var(--accent);
+       border-radius: inherit;
+    }
+    .slider-round {
+	height: 10px;
+    }
+
+    .slider-round .noUi-connect {
+	background: var(--accent);
+        height: 0.5rem;
+    }
+
+    .slider-round .noUi-handle {
+	height: 18px;
+	width: 18px;
+	top: -5px;
+	right: -9px; /* half the width */
+	border-radius: 9px;
+    }
+    .slider-round .noUi-horizontal .noUi-handle {
+      height: 16px;
+      width: 16px;
+      top: -4px;
+      right: -9px; /* half the width */
+      border-radius: 9px;
+    }
+
+    .noUi-touch-area {
+	background: var(--accent);
+	border-radius: inherit;
+    }
+    /* Remove internal pseudo-elements from noUiSlider */
+    .slider-round .noUi-handle::before,
+    .slider-round .noUi-handle::after {
+      display: none !important;
+      content: none !important;
+    }
+
+    .slider-round .noUi-tooltip::before,
+    .slider-round .noUi-tooltip::after {
+      display: none !important;
+      content: none !important;
+    }
+    .slider-round .noUi-target {
+	background: rgba(255,255,255,0.9);
+	border-radius: var(--border-radius);
+	height: 12px;
+	box-shadow: inset 0 1px 1px #F0F0F0, 0 4px 6px -5px #BBB;
+	border: none;
+    }
   </style>
+  <!-- noUiSlider CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css" rel="stylesheet" />
+  <!-- noUiSlider JS -->
+  <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+    <style>
+/* 🌈 Unified Slider Aesthetic for noUiSlider */
+.slider-round .noUi-target {
+  border-radius: var(--border-radius);
+  height: 12px; /* Match native slider height */
+  background-color: rgba(255,255,255,0.1);
+  box-shadow: none;
+  border: none;
+}
+
+.slider-round .noUi-connect {
+  background: var(--accent);
+  /* height of bar between min-max sliders*/
+  height: 6px;
+  top: 2;
+  border-radius: var(--border-radius);
+}
+
+/* Thumb styling */
+.slider-round .noUi-handle {
+  height: 10px;
+  width: 1-px;
+  background: var(--accent);
+  border-radius: 50%;
+  top: -4px;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: var(--transition-fast);
+  cursor: pointer;
+}
+
+/* Optional: subtle hover effect for better UX */
+.slider-round .noUi-handle:hover {
+  background: #5cf;
+  box-shadow: 0 0 6px #5cf;
+}
+
+.slider-round .noUi-horizontal .noUi-handle {
+  right: -7px; /* center-align with track */
+}
+
+</style>
 </head>
 <body>
   <div id="topBar">
@@ -102,6 +512,14 @@
   </div>
 
   <canvas id="sceneCanvas"></canvas>
+
+  <!-- Layers Panel -->
+  <div class="floating-panel" id="layersPanel" style="bottom: 70px; left: 10px; width: 240px; max-height: 300px; overflow: auto;">
+    <div class="title-bar">📚 Layers</div>
+    <div class="panel-content" id="layerList">
+      <!-- Layers injected here -->
+    </div>
+  </div>
 
   <!-- Lighting Panel -->
   <div class="floating-panel" id="lightingPanel" style="top: 70px; left: 10px;">
@@ -119,26 +537,7 @@
   <!-- Object + Geometry Panel -->
   <div class="floating-panel" id="objectPanel" style="top: 70px; right: 10px;">
     <div class="title-bar">📦 Object Properties</div>
-    <div class="panel-content">
-      <h4>Surface</h4>
-      <label>Color</label>
-      <input type="color" id="objColor" value="none">
-      <label>Metalness</label>
-      <input type="range" id="objMetal" min="0" max="1" step="0.01" value="1">
-      <label>Roughness</label>
-      <input type="range" id="objRough" min="0" max="1" step="0.01" value="0">
-
-      <h4>Geometry Defaults</h4>
-      <label>Radius <input type="number" id="radius" value="10" step="0.1"></label>
-      <label>Tube <input type="number" id="tube" value="3" step="0.1"></label>
-      <label>Tubular Segments <input type="number" id="tubularSegments" value="100" step="1"></label>
-      <label>Radial Segments <input type="number" id="radialSegments" value="16" step="1"></label>
-      <label>p <input type="number" id="p" value="2" step="1"></label>
-      <label>q <input type="number" id="q" value="3" step="1"></label>
-
-      <h4>Geometry Animation</h4>
-      <div id="geometryAnimations"></div>
-    </div>
+    <div id="objectPropertiesPanel"></div>
   </div>
 
   <!-- Audio Panel -->
